@@ -126,7 +126,10 @@ async function createOrGetCustomer(email, name) {
 }
 
 async function createOrder({ locationId, customerId, per, guests, taxRate, travel, tip, note }) {
-  const idempotency = globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2);
+  function safeId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+const idempotency = safeId();
 
   // Define a single order-level tax and apply it to the package line via applied_taxes
   const TAX_UID = "ma-tax";
@@ -230,8 +233,7 @@ async function sendOwnerNotification({ endpoint, ownerEmail, name, email, event_
     `Total Before Tip: $${totals.totalBeforeTip.toFixed(2)}`,
     `FINAL: $${totals.finalTotal.toFixed(2)}`,
     `Invoice: ${invoiceUrl || invoiceId}`
-  ].filter(Boolean).join("
-");
+   ].filter(Boolean).join("\n");
 
   await fetch(endpoint, {
     method: "POST",
