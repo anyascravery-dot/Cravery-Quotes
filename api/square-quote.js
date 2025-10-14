@@ -68,8 +68,24 @@ export default async function handler(req, res) {
     const invoice = await createInvoice({ orderId: order.id, customerId: customer.id });
     const published = await publishInvoice(invoice.id, invoice.version);
 
-    // (Optional) log to server
-    console.log("✅ Sandbox invoice published:", published.id, published.public_url);
+    // OPTIONAL: notify owner via Formspree if configured
+    if (process.env.FORMSPREE_OWNER_ENDPOINT && process.env.OWNER_EMAIL) {
+      try {
+        await sendOwnerNotification({
+          endpoint: process.env.FORMSPREE_OWNER_ENDPOINT,
+          ownerEmail: process.env.OWNER_EMAIL,
+          name,
+          email,
+          event_address,
+          miles: milesNum,
+          per,
+          guests: guestCount,
+          totals: { items, tax, travel, tip, totalBeforeTip, finalTotal },
+          invoiceUrl: published.public_url || null,
+          invoiceId: published.id
+        });
+      } catch (e) { console.warn("Owner notify failed", e); }
+    }
 
     return res.status(200).json({
       success: true,
@@ -202,4 +218,28 @@ async function publishInvoice(invoiceId, version = 1) {
   return resp.invoice;
 }
 
+// --- Owner notification via Formspree (simple) ---
+async function sendOwnerNotification({ endpoint, ownerEmail, name, email, event_address, miles, per, guests, totals, invoiceUrl, invoiceId }) {
+  const summary = [
+    `New quote: ${name} <${email}>`,
+    event_address ? `Event: ${event_address}` : null,
+    `Miles: ${miles.toFixed(1)}`,
+    `Package: $${per.toFixed(2)} x ${guests}`,
+    `Items: $${totals.items.toFixed(2)}, Tax: $${totals.tax.toFixed(2)}`,
+    `Travel: $${totals.travel.toFixed(2)}, Tip: $${totals.tip.toFixed(2)}`,
+    `Total Before Tip: $${totals.totalBeforeTip.toFixed(2)}`,
+    `FINAL: $${totals.finalTotal.toFixed(2)}`,
+    `Invoice: ${invoiceUrl || invoiceId}`
+  ].filter(Boolean).join("
+");
 
+  await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "Cravery Quotes Bot",
+      email: ownerEmail,
+      message: summary
+    })
+  });
+}
