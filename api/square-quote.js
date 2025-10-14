@@ -1,5 +1,6 @@
-// Minimal SANDBOX integration for Square
 // File: /api/square-quote.js
+// Purpose: Receive quote data, recompute totals (authoritative),
+//          create/get Square customer, create Order, create & publish Invoice (emails sandbox invoice)
 
 const SQUARE_BASE = "https://connect.squareupsandbox.com"; // SANDBOX base URL
 const SQUARE_VERSION = "2025-09-24"; // or latest shown in your Square dashboard
@@ -21,9 +22,8 @@ function applyCors(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") {
-    // Preflight
-    res.status(204).end();
-    return true; // handled
+    res.status(204).end(); // preflight OK
+    return true;           // handled
   }
   return false;
 }
@@ -120,6 +120,7 @@ export default async function handler(req, res) {
 }
 
 async function createOrGetCustomer(email, name) {
+  // Search by exact email
   const search = await fetch(`${SQUARE_BASE}/v2/customers/search`, {
     method: "POST",
     headers: reqHeaders(),
@@ -148,6 +149,7 @@ async function createOrder({ locationId, customerId, per, guests, taxRate, trave
   }
   const idempotency = safeId();
 
+  // Define a single order-level tax and apply it to the package line via applied_taxes
   const TAX_UID = "ma-tax";
 
   const body = {
@@ -155,6 +157,8 @@ async function createOrder({ locationId, customerId, per, guests, taxRate, trave
     order: {
       location_id: locationId,
       customer_id: customerId,
+
+      // Order-level tax definition (ADDITIVE percentage)
       taxes: [
         {
           uid: TAX_UID,
@@ -164,12 +168,14 @@ async function createOrder({ locationId, customerId, per, guests, taxRate, trave
           scope: "LINE_ITEM",
         },
       ],
+
       line_items: [
         {
           name: "Package",
           quantity: String(guests),
           base_price_money: money(per),
-          applied_taxes: [{ tax_uid: TAX_UID }], // tax only on items
+          // Apply the above tax to this line
+          applied_taxes: [{ tax_uid: TAX_UID }],
         },
         {
           name: "Travel Fee",
