@@ -112,24 +112,33 @@ async function createOrGetCustomer(email, name) {
 async function createOrder({ locationId, customerId, per, guests, taxRate, travel, tip, note }) {
   const idempotency = globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2);
 
+  // Define a single order-level tax and apply it to the package line via applied_taxes
+  const TAX_UID = "ma-tax";
+
   const body = {
     idempotency_key: idempotency,
     order: {
       location_id: locationId,
       customer_id: customerId,
+
+      // Order-level tax definition (ADDITIVE percentage)
+      taxes: [
+        {
+          uid: TAX_UID,
+          name: "Sales Tax",
+          type: "ADDITIVE",
+          percentage: String(taxRate * 100), // e.g., 6.25
+          scope: "LINE_ITEM"
+        }
+      ],
+
       line_items: [
         {
           name: "Package",
           quantity: String(guests),
           base_price_money: money(per),
-          taxes: [
-            {
-              name: "Sales Tax",
-              type: "ADDITIVE",
-              percentage: String(taxRate * 100), // e.g. 6.25
-              scope: "LINE_ITEM"
-            }
-          ]
+          // Apply the above tax to this line
+          applied_taxes: [ { tax_uid: TAX_UID } ]
         },
         {
           name: "Travel Fee",
@@ -192,4 +201,5 @@ async function publishInvoice(invoiceId, version = 1) {
   if (!resp?.invoice?.id) throw new Error("Failed to publish invoice: " + JSON.stringify(resp));
   return resp.invoice;
 }
+
 
