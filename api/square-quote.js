@@ -2,14 +2,13 @@
 // Purpose: Receive quote data, recompute totals (authoritative),
 //          create/get Square customer, create Order, create & publish Invoice (emails sandbox invoice)
 
-const SQUARE_BASE = "https://connect.squareupsandbox.com"; // SANDBOX base URL
+const SQUARE_BASE = "https://connect.squareup.com"; // LIVE base URL
 const SQUARE_VERSION = "2025-09-24"; // or latest shown in your Square dashboard
 
 // --- CORS helper (allow your site to call this endpoint) ---
 const ALLOWED_ORIGINS = [
   "https://thecraveryllc.com",
   "https://www.thecraveryllc.com",
-  "https://thecravery.squarespace.com", // optional: preview domain
   "https://cravery-quotes.vercel.app"   // for quick tests
 ];
 
